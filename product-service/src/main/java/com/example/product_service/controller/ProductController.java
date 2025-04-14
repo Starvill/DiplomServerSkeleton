@@ -18,6 +18,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Random;
 
 @RestController
 @RequestMapping("/products")
@@ -41,7 +42,7 @@ public class ProductController {
 
         // Если у продукта указан файл
         if (product.getImagePath() != null) {
-            Path filePath = Paths.get("C:\\vus\\diplomproject\\back\\product-service\\src\\main\\java\\com\\example\\product_service\\uploads", product.getImagePath());
+            Path filePath = Paths.get("uploads", product.getImagePath());
             if (Files.exists(filePath)) {
                 // Создаем ресурс для файла
                 Resource fileResource = new FileSystemResource(filePath.toFile());
@@ -127,21 +128,36 @@ public class ProductController {
 
     // Метод для сохранения файла
     private String saveFile(MultipartFile file) throws IOException {
-        Path uploadPath = Paths.get("C:\\vus\\diplomproject\\back\\product-service\\src\\main\\java\\com\\example\\product_service\\uploads");
+        Path uploadPath = Paths.get("uploads"); // Папка для загрузки
         if (!Files.exists(uploadPath)) {
             Files.createDirectories(uploadPath);
         }
+
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || originalFilename.isEmpty()) {
             return "Файл не содержит имени!";
         }
+        String name = originalFilename;
+        String extension = "";
+        int dotIndex = originalFilename.lastIndexOf(".");
+        if (dotIndex > 0) {
+            name = originalFilename.substring(0, dotIndex);
+            extension = originalFilename.substring(dotIndex);
+        }
         Path filePath = uploadPath.resolve(originalFilename);
-        file.transferTo(filePath.toFile());
+        while (Files.exists(filePath)) {
+            String randomCode = String.format("_%06d", new Random().nextInt(1_000_000));
+            String newFilename = name + randomCode + extension;
+            filePath = uploadPath.resolve(newFilename);
+            originalFilename = newFilename;
+        }
+
+        file.transferTo(filePath);
         return originalFilename;
     }
 
     private String deleteFile(String fileName) throws IOException {
-        Path uploadPath = Paths.get("C:\\vus\\diplomproject\\back\\product-service\\src\\main\\java\\com\\example\\product_service\\uploads");
+        Path uploadPath = Paths.get("uploads");
         if (!Files.exists(uploadPath)) {
             return "Папка uploads не найдена!";
         }
