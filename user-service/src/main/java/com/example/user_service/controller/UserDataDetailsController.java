@@ -1,6 +1,9 @@
 package com.example.user_service.controller;
 
 import com.example.user_service.model.Gender;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,6 +18,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Optional;
+import java.util.Random;
 
 @RestController
 @RequestMapping("/users/secured/details")
@@ -26,10 +31,26 @@ public class UserDataDetailsController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UserDataDetails> getUserById(@PathVariable Long id) {
-        return service.getUserById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> getUserById(@PathVariable Long id) {
+        Optional<UserDataDetails> optionalUser = service.getUserByUserId(id);
+        UserDataDetails userDataDetails = optionalUser.get();
+        return ResponseEntity.ok(userDataDetails);
+    }
+
+    @GetMapping("/photo/{id}")
+    public ResponseEntity<?> getPhotoUserById(@PathVariable Long id) {
+        Optional<UserDataDetails> optionalUser = service.getUserByUserId(id);
+        UserDataDetails userDataDetails = optionalUser.get();
+        if (userDataDetails.getProfilePhoto()!= null) {
+            Path filePath = Paths.get("uploads", userDataDetails.getProfilePhoto());
+            if (Files.exists(filePath)) {
+                Resource fileResource = new FileSystemResource(filePath.toFile());
+                return ResponseEntity.ok()
+                        .header("Content-Disposition", "attachment; filename=\"" + userDataDetails.getProfilePhoto() + "\"")
+                        .body(fileResource);
+            }
+        }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("File not found");
     }
 
 
@@ -42,13 +63,14 @@ public class UserDataDetailsController {
             return ResponseEntity.badRequest().body("We do not accept combat helicopters");
         }
         try {
-            // Логика сохранения файла, если он был предоставлен
             String imagePath = null;
             if (file != null && !file.isEmpty()) {
-                // Сохранить файл, например, в локальную директорию
                 imagePath = saveFile(file);
+                if (imagePath == null) {
+                    return ResponseEntity.badRequest().body("Failed to save file");
+                }
             }
-            System.out.println(imagePath);
+
             updatedUser.setProfilePhoto(imagePath);
             return ResponseEntity.ok(service.updateUser(id, updatedUser));
         } catch (RuntimeException | IOException e) {
@@ -57,21 +79,36 @@ public class UserDataDetailsController {
     }
     // Метод для сохранения файла
     private String saveFile(MultipartFile file) throws IOException {
-        Path uploadPath = Paths.get("C:\\vus\\diplomproject\\back\\user-service\\src\\main\\java\\com\\example\\user_service\\uploads");
+        Path uploadPath = Paths.get("uploads"); // Папка для загрузки
         if (!Files.exists(uploadPath)) {
             Files.createDirectories(uploadPath);
         }
+
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || originalFilename.isEmpty()) {
             return "Файл не содержит имени!";
         }
+        String name = originalFilename;
+        String extension = "";
+        int dotIndex = originalFilename.lastIndexOf(".");
+        if (dotIndex > 0) {
+            name = originalFilename.substring(0, dotIndex);
+            extension = originalFilename.substring(dotIndex);
+        }
         Path filePath = uploadPath.resolve(originalFilename);
-        file.transferTo(filePath.toFile());
+        while (Files.exists(filePath)) {
+            String randomCode = String.format("_%06d", new Random().nextInt(1_000_000));
+            String newFilename = name + randomCode + extension;
+            filePath = uploadPath.resolve(newFilename);
+            originalFilename = newFilename;
+        }
+        System.out.println(filePath);
+        file.transferTo(filePath);
         return originalFilename;
     }
 
     private String deleteFile(String fileName) throws IOException {
-        Path uploadPath = Paths.get("C:\\vus\\diplomproject\\back\\user-service\\src\\main\\java\\com\\example\\user_service\\uploads");
+        Path uploadPath = Paths.get("uploads");
         if (!Files.exists(uploadPath)) {
             return "Папка uploads не найдена!";
         }

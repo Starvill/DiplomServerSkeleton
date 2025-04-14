@@ -19,7 +19,7 @@ public class UserDataDetailsService {
         this.repository = repository;
     }
 
-    public Optional<UserDataDetails> getUserById(Long id) {
+    public Optional<UserDataDetails> getUserByUserId(Long id) {
         return repository.findByUserId(id);
     }
 

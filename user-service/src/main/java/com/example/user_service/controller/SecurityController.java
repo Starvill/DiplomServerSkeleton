@@ -4,6 +4,7 @@ import com.example.user_service.dto.SigninRequest;
 import com.example.user_service.dto.SignupRequest;
 import com.example.user_service.model.User;
 import com.example.user_service.service.UserDataDetailsService;
+import com.example.user_service.service.EmailService;
 import com.example.user_service.repository.UserRepository;
 import com.example.user_service.jwt.JwtCore;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/users/auth")
@@ -25,6 +29,11 @@ public class SecurityController {
     private  PasswordEncoder passwordEncoder;
     private  AuthenticationManager authenticationManager;
     private JwtCore jwtCore;
+
+    @Autowired
+    private EmailService emailService;
+    private final Map<String, String> verificationCodes = new HashMap<>();
+
     @Autowired
     private UserDataDetailsService userDataDetailsService;
 
@@ -39,7 +48,7 @@ public class SecurityController {
     }
     @Autowired
     public void setAuthenticationManager (AuthenticationManager authenticationManager) {
-        this.authenticationManager = authenticationManager;
+        this.authenticationManager =   authenticationManager;
     }
     @Autowired
     public void setJwtCore(JwtCore jwtCore) {
@@ -48,11 +57,13 @@ public class SecurityController {
 
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody SignupRequest signupRequest) {
-        System.out.println("signup");
         if (userRepository.existsUserByUsername(signupRequest.getUsername())) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Choose different name");
         }
         if (userRepository.existsUserByEmail(signupRequest.getEmail())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Choose different email");
+        }
+        if (verificationCodes.containsKey(signupRequest.getEmail())) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Choose different email");
         }
         String hashed = passwordEncoder.encode(signupRequest.getPassword());
@@ -63,12 +74,36 @@ public class SecurityController {
         User savedUser = userRepository.save(user);
         System.out.println(savedUser);
         userDataDetailsService.createUser(savedUser.getId());
+        String code = emailService.sendVerificationCode(signupRequest.getEmail());
+        verificationCodes.put(signupRequest.getEmail(), code);
         return ResponseEntity.ok("Success signup");
+    }
+
+    @PostMapping("/verify")
+    public ResponseEntity<?> verifyCode(@RequestParam String email, @RequestParam String code) {
+        System.out.println(verificationCodes.containsKey(email));
+        if (!verificationCodes.containsKey(email)) {
+            return ResponseEntity.badRequest().body("Verification code not found. Request a new one.");
+        }
+        if (!verificationCodes.get(email).equals(code)) {
+            return ResponseEntity.badRequest().body("Invalid verification code.");
+        }
+        verificationCodes.remove(email);
+        return ResponseEntity.ok("Email verified successfully.");
     }
 
     @PostMapping("/signin")
     public ResponseEntity<?> signin(@RequestBody SigninRequest signinRequest) {
-        System.out.println("signin");
+        Optional<User> optionalUser = userRepository.findUserByUsername(signinRequest.getUsername());
+        if (optionalUser.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+        }
+        User user = optionalUser.get();
+        if (verificationCodes.containsKey(user.getEmail())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Email not verified. Please check your email for the verification code.");
+        }
+
         Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(
