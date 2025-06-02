@@ -75,6 +75,7 @@ public class SecurityController {
         System.out.println(savedUser);
         userDataDetailsService.createUser(savedUser.getId());
         String code = emailService.sendVerificationCode(signupRequest.getEmail());
+        System.out.println(code);
         verificationCodes.put(signupRequest.getEmail(), code);
         return ResponseEntity.ok("Success signup");
     }

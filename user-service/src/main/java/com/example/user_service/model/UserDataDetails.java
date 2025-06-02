@@ -16,6 +16,7 @@ public class UserDataDetails {
     private Long userId;
     private String name;
     private int age;
+    private int weight;
 
     @Enumerated(EnumType.STRING) // Хранит в БД как строку ("MALE" или "FEMALE")
     private Gender gender;

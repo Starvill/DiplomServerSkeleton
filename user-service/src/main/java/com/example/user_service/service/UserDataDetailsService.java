@@ -37,6 +37,7 @@ public class UserDataDetailsService {
                     existingUser.setAge(updatedUser.getAge());
                     existingUser.setGender(updatedUser.getGender());
                     existingUser.setHeight(updatedUser.getHeight());
+                    existingUser.setWeight(updatedUser.getWeight());
                     existingUser.setProfilePhoto(updatedUser.getProfilePhoto());
                     return repository.save(existingUser);
                 })
