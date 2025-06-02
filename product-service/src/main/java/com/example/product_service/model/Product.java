@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Date;
 
